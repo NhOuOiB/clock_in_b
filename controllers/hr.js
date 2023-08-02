@@ -2,8 +2,7 @@ const hrModel = require('../models/hr');
 const moment = require('moment');
 
 async function getCheckRecord(req, res) {
-    let data = await hrModel.getCheckRecord();
-    console.log(data);
+  let data = await hrModel.getCheckRecord();
   res.json(data);
 }
 
