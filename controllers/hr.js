@@ -8,13 +8,19 @@ async function getCheckRecord(req, res) {
 
 async function addCheckRecord(req, res) {
   let { id, type, lat, lng } = req.body;
-  console.log(lat, lng);
   let now = moment().format('YYYY-MM-DD HH:mm:ss');
   await hrModel.addCheckRecord(id, type, now, lat, lng);
+  res.json('成功');
+}
+
+async function addEmployee(req, res) {
+  let { account, password, permission, name, salary } = req.body;
+  await hrModel.addEmployee(account, password, permission, name, salary);
   res.json('成功');
 }
 
 module.exports = {
   getCheckRecord,
   addCheckRecord,
+  addEmployee
 };
