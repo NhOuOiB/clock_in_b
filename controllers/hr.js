@@ -9,8 +9,13 @@ async function getCheckRecord(req, res) {
 async function addCheckRecord(req, res) {
   let { id, type, lat, lng } = req.body;
   let now = moment().format('YYYY-MM-DD HH:mm:ss');
-  await hrModel.addCheckRecord(id, type, now, lat, lng);
-  res.json('成功');
+  let result = await hrModel.addCheckRecord(id, type, now, lat, lng);
+
+  if (result.message == '新增失敗') {
+    res.status(401).json('新增失敗');
+  } else if (result.message == '新增成功') {
+    res.json('新增成功');
+  }
 }
 
 async function addEmployee(req, res) {
@@ -22,5 +27,5 @@ async function addEmployee(req, res) {
 module.exports = {
   getCheckRecord,
   addCheckRecord,
-  addEmployee
+  addEmployee,
 };

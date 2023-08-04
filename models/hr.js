@@ -27,7 +27,10 @@ async function addCheckRecord(id, type, now, lat, lng) {
 
     let res = await request.query('INSERT INTO check_record (employee_id, time, type, lat, lng) VALUES (@employee_id, @now, @type, @lat, @lng)');
 
-    return { message: '新增成功' };
+    if (res.rowsAffected[0] != 1) {
+      return { message: '新增失敗' };
+    }
+      return { message: '新增成功' };
   } catch (error) {
     console.log(error);
     return { message: '伺服器錯誤' };
