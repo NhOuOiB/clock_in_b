@@ -11,11 +11,21 @@ router.post('/login', async (req, res) => {
       console.log(err);
       return res.status(500).json({ message: '資料庫連接錯誤' });
     }
-
     try {
       const request = new mssql.Request(pool);
       request.input('account', mssql.VarChar, req.body.account);
       request.input('password', mssql.VarChar, req.body.password);
+      request.input('individual_id', mssql.VarChar, req.body.individual_id);
+
+      let find_individual_case = await request.query('SELECT ic.individual_id FROM individual_case ic WHERE individual_id = @individual_id AND enable = 1')
+      let individual_data = find_individual_case.recordset
+
+      if (individual_data.length == 0) {
+        return res.status(401).json({message: '個案代號錯誤'})
+      }
+      
+      let individual = individual_data[0]
+
       let result = await request.query(
         'SELECT a.id, e.employee_id, e.name, a.permission FROM account a Left JOIN employee e ON a.employee_id = e.employee_id  WHERE account = @account AND password = @password AND e.enable = 1',
       );
@@ -30,6 +40,7 @@ router.post('/login', async (req, res) => {
       let payload = {
         id: user.id,
         name: user.name,
+        individual_id: individual.individual_id,
         permission: user.permission,
       };
 
@@ -43,7 +54,7 @@ router.post('/login', async (req, res) => {
         expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 天
       });
 
-      res.json({ message: '成功登入', permission: user.permission, id: user.employee_id });
+      res.json({ message: '成功登入', permission: user.permission, id: user.employee_id, individual_id: individual.individual_id });
     } catch (error) {
       console.log(error);
       res.status(500).json({ message: '伺服器錯誤' });
