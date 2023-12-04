@@ -1,14 +1,55 @@
 const pool = require('../utils/db');
 const mssql = require('mssql');
 
-async function getClockRecord() {
+async function getClockRecord(settlement_id, begin, end) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
+    const { DateTime, Int } = mssql;
 
-    let res = await request.query(
-      'SELECT ic.individual_name, ic.morning_wage, ic.afternoon_wage, ic.night_wage, e.name, cr.in_lat_lng, cr.out_lat_lng, cr.in_time, cr.out_time FROM clock_record cr INNER JOIN employee e ON cr.employee_id = e.employee_id INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id ORDER BY cr.in_time DESC',
-    );
+    // 創建查詢條件
+    const conditions = [];
+    const parameters = [];
+
+    if (settlement_id !== '') {
+      conditions.push('ic.settlement_id = @settlement_id');
+      parameters.push({ name: 'settlement_id', type: Int, value: settlement_id });
+    }
+
+    if (begin !== '') {
+      conditions.push('cr.in_time > @begin');
+      parameters.push({ name: 'begin', type: DateTime, value: begin });
+    }
+
+    if (end !== '') {
+      conditions.push('cr.out_time < @end');
+      parameters.push({ name: 'end', type: DateTime, value: end });
+    }
+
+    // 構建 SQL 查詢
+    const sqlQuery = `
+  SELECT 
+    ic.individual_name, 
+    ic.morning_wage, 
+    ic.afternoon_wage, 
+    ic.night_wage, 
+    e.name, 
+    cr.in_lat_lng, 
+    cr.out_lat_lng, 
+    cr.in_time, 
+    cr.out_time 
+  FROM 
+    clock_record cr 
+    INNER JOIN employee e ON cr.employee_id = e.employee_id 
+    INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id 
+  ${conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''}
+  ORDER BY cr.in_time DESC`;
+
+    // 添加查詢條件的輸入參數
+    parameters.forEach((param) => request.input(param.name, param.type, param.value));
+
+    // 執行查詢
+    const res = await request.query(sqlQuery);
 
     return res.recordset;
   } catch (error) {
@@ -29,7 +70,7 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     request.input('latlng', mssql.VarChar, `${lat}, ${lng}`);
 
     let already_clock_in = await request.query(
-      "SELECT id FROM clock_record WHERE employee_id = @employee_id AND individual_id = @individual_id AND in_time >= DATEADD(DAY, DATEDIFF(DAY, 0, @now), -1) + '23:00' AND in_time < DATEADD(DAY, DATEDIFF(DAY, 0, @now), 0) + '23:00';",
+      "SELECT id FROM clock_record WHERE employee_id = @employee_id AND individual_id = @individual_id AND in_time >= DATEADD(DAY, DATEDIFF(DAY, 0, @now), -1) + '23:00' AND in_time < DATEADD(DAY, DATEDIFF(DAY, 0, @now), 0) + '23:00'",
     );
     if (type == '上班') {
       if (already_clock_in.recordset.length === 0) {
@@ -373,6 +414,42 @@ async function getSpecialCase() {
   }
 }
 
+async function getSpecialCaseRecord() {
+  let connection = await pool.connect();
+  try {
+    const request = new mssql.Request(connection);
+
+    const { DateTime } = mssql;
+
+    // 創建查詢條件
+    const conditions = [];
+    const parameters = [];
+
+    if (begin !== '') {
+      conditions.push('cr.in_time > @begin');
+      parameters.push({ name: 'begin', type: DateTime, value: begin });
+    }
+
+    if (end !== '') {
+      conditions.push('cr.out_time < @end');
+      parameters.push({ name: 'end', type: DateTime, value: end });
+    }
+
+    let res = await request.query(
+      `SELECT scr.id, scr.begin, scr.end, sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON sc.special_case_id = scr.special_case_id WHERE sc.enable = 1 ${
+        conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''
+      }`,
+    );
+
+    parameters.forEach((param) => request.input(param.name, param.type, param.value));
+
+    return res.recordset;
+  } catch (error) {
+    console.log(error);
+    return { message: '伺服器錯誤' };
+  }
+}
+
 async function getType() {
   let connection = await pool.connect();
   try {
@@ -420,6 +497,7 @@ module.exports = {
   updateSpecialRecord,
   deleteSpecialRecord,
   getSpecialCase,
+  getSpecialCaseRecord,
   getType,
   getSettlement,
 };

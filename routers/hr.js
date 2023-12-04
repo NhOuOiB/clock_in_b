@@ -38,6 +38,8 @@ router.put('/deleteSpecialRecord', hrController.deleteSpecialRecord);
 
 router.get('/getSpecialCase', hrController.getSpecialCase)
 
+router.get('/getSpecialCaseRecord', hrController.getSpecialCaseRecord)
+
 router.get('/getType', hrController.getType);
 
 router.get('/getSettlement', hrController.getSettlement);

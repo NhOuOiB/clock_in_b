@@ -2,7 +2,8 @@ const hrModel = require('../models/hr');
 const moment = require('moment');
 
 async function getClockRecord(req, res) {
-  let data = await hrModel.getClockRecord();
+  let { settlement_id, begin, end } = req.query;
+  let data = await hrModel.getClockRecord(settlement_id, begin, end);
   res.json(data);
 }
 
@@ -19,7 +20,7 @@ async function getEmployee(req, res) {
 }
 
 async function getEmployeeById(req, res) {
-  let {employee_id} = req.params
+  let { employee_id } = req.params;
   console.log(req.params);
   let data = await hrModel.getEmployeeById(employee_id);
   res.json(data);
@@ -109,6 +110,12 @@ async function getSpecialCase(req, res) {
   res.json(data);
 }
 
+async function getSpecialCaseRecord(req, res) {
+  let { begin, end } = req.query;
+  let data = await hrModel.getSpecialCaseRecord(begin, end);
+  res.json(data);
+}
+
 async function getType(req, res) {
   let data = await hrModel.getType();
   res.json(data);
@@ -138,6 +145,7 @@ module.exports = {
   updateSpecialRecord,
   deleteSpecialRecord,
   getSpecialCase,
+  getSpecialCaseRecord,
   getType,
-  getSettlement
+  getSettlement,
 };
