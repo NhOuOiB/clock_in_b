@@ -14,6 +14,18 @@ async function addClockRecord(req, res) {
   res.json(result);
 }
 
+async function updateClockRecord(req, res) {
+  let { account, password, name, employee_id } = req.body;
+  let response = await hrModel.updateClockRecord(account, password, name, employee_id);
+  res.json(response);
+}
+
+async function deleteClockRecord(req, res) {
+  let { id } = req.query;
+  let response = await hrModel.deleteClockRecord(id);
+  res.json(response);
+}
+
 async function getEmployee(req, res) {
   let data = await hrModel.getEmployee();
   res.json(data);
@@ -21,7 +33,6 @@ async function getEmployee(req, res) {
 
 async function getEmployeeById(req, res) {
   let { employee_id } = req.params;
-  console.log(req.params);
   let data = await hrModel.getEmployeeById(employee_id);
   res.json(data);
 }
@@ -34,13 +45,11 @@ async function addEmployee(req, res) {
 
 async function updateEmployee(req, res) {
   let { account, password, name, employee_id } = req.body;
-  console.log(req.body);
   let response = await hrModel.updateEmployee(account, password, name, employee_id);
   res.json(response);
 }
 
 async function deleteEmployee(req, res) {
-  console.log(req.query);
   let { employee_id } = req.query;
   let response = await hrModel.deleteEmployee(employee_id);
   res.json(response);
@@ -53,7 +62,6 @@ async function getIndividual(req, res) {
 
 async function getIndividualById(req, res) {
   let { individual_id } = req.params;
-  console.log(req.params);
   let data = await hrModel.getIndividualById(individual_id);
   res.json(data);
 }
@@ -129,6 +137,8 @@ async function getSettlement(req, res) {
 module.exports = {
   getClockRecord,
   addClockRecord,
+  updateClockRecord,
+  deleteClockRecord,
   getEmployee,
   getEmployeeById,
   addEmployee,

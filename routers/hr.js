@@ -6,6 +6,10 @@ router.get('/getClockRecord', hrController.getClockRecord);
 
 router.post('/addClockRecord', hrController.addClockRecord);
 
+router.put('/updateClockRecord', hrController.updateClockRecord);
+
+router.put('/deleteClockRecord', hrController.deleteClockRecord);
+
 router.get('/getEmployee', hrController.getEmployee);
 
 router.get('/getEmployeeById/:employee_id', hrController.getEmployeeById);

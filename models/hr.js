@@ -25,6 +25,8 @@ async function getClockRecord(settlement_id, begin, end) {
       conditions.push('cr.out_time < @end');
       parameters.push({ name: 'end', type: DateTime, value: end });
     }
+    
+    parameters.forEach((param) => request.input(param.name, param.type, param.value));
 
     // 構建 SQL 查詢
     const sqlQuery = `
@@ -34,6 +36,7 @@ async function getClockRecord(settlement_id, begin, end) {
     ic.afternoon_wage, 
     ic.night_wage, 
     e.name, 
+    cr.id, 
     cr.in_lat_lng, 
     cr.out_lat_lng, 
     cr.in_time, 
@@ -41,13 +44,11 @@ async function getClockRecord(settlement_id, begin, end) {
   FROM 
     clock_record cr 
     INNER JOIN employee e ON cr.employee_id = e.employee_id 
-    INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id 
-  ${conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''}
+    INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id
+    WHERE cr.enable = 1 ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
   ORDER BY cr.in_time DESC`;
 
-    // 添加查詢條件的輸入參數
-    parameters.forEach((param) => request.input(param.name, param.type, param.value));
-
+    console.log(sqlQuery);
     // 執行查詢
     const res = await request.query(sqlQuery);
 
@@ -102,6 +103,36 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
         }
       }
     }
+  } catch (error) {
+    console.log(error);
+    return { message: '伺服器錯誤' };
+  }
+}
+
+async function updateClockRecord(account, password, name, employee_id) {
+  let connection = await pool.connect();
+  try {
+    const request = new mssql.Request(connection);
+
+
+    if (update_account.rowsAffected[0] == 1 && update_employee.rowsAffected[0] == 1) {
+      return { message: '更新成功' };
+    }
+  } catch (error) {
+    console.log(error);
+    return { message: '伺服器錯誤' };
+  }
+}
+
+async function deleteClockRecord(id) {
+  let connection = await pool.connect();
+  try {
+    const request = new mssql.Request(connection);
+    request.input('id', mssql.Int, id);
+
+    let update_account = await request.query('UPDATE clock_record SET enable = 0 WHERE id = @id');
+
+    if (update_account.rowsAffected[0] == 1) return { message: '刪除成功' };
   } catch (error) {
     console.log(error);
     return { message: '伺服器錯誤' };
@@ -414,7 +445,7 @@ async function getSpecialCase() {
   }
 }
 
-async function getSpecialCaseRecord() {
+async function getSpecialCaseRecord(begin, end) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
@@ -426,22 +457,24 @@ async function getSpecialCaseRecord() {
     const parameters = [];
 
     if (begin !== '') {
-      conditions.push('cr.in_time > @begin');
+      conditions.push('scr.[begin] > @begin');
       parameters.push({ name: 'begin', type: DateTime, value: begin });
     }
 
     if (end !== '') {
-      conditions.push('cr.out_time < @end');
+      conditions.push('scr.[end] < @end');
       parameters.push({ name: 'end', type: DateTime, value: end });
     }
 
+
+    parameters.forEach((param) => request.input(param.name, param.type, param.value));
+    
     let res = await request.query(
-      `SELECT scr.id, scr.begin, scr.end, sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON sc.special_case_id = scr.special_case_id WHERE sc.enable = 1 ${
+      `SELECT scr.id, scr.[begin], scr.[end], sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON sc.special_case_id = scr.special_case_id WHERE sc.enable = 1 ${
         conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''
       }`,
     );
 
-    parameters.forEach((param) => request.input(param.name, param.type, param.value));
 
     return res.recordset;
   } catch (error) {
@@ -456,7 +489,6 @@ async function getType() {
     const request = new mssql.Request(connection);
 
     let res = await request.query('SELECT t.type_id, t.type_name FROM type t WHERE t.enable = 1');
-    console.log(res.recordset);
     return res.recordset;
   } catch (error) {
     console.log(error);
@@ -470,7 +502,6 @@ async function getSettlement() {
     const request = new mssql.Request(connection);
 
     let res = await request.query('SELECT s.settlement_id, s.settlement_name FROM settlement s WHERE s.enable = 1');
-    console.log(res.recordset);
     return res.recordset;
   } catch (error) {
     console.log(error);
@@ -481,6 +512,8 @@ async function getSettlement() {
 module.exports = {
   getClockRecord,
   addClockRecord,
+  updateClockRecord,
+  deleteClockRecord,
   getEmployee,
   getEmployeeById,
   addEmployee,
