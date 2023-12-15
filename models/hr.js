@@ -31,6 +31,7 @@ async function getClockRecord(settlement_id, begin, end) {
     // 構建 SQL 查詢
     const sqlQuery = `
   SELECT 
+    ic.individual_id, 
     ic.individual_name, 
     ic.morning_wage, 
     ic.afternoon_wage, 
@@ -48,7 +49,6 @@ async function getClockRecord(settlement_id, begin, end) {
     WHERE cr.enable = 1 ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
   ORDER BY cr.in_time DESC`;
 
-    console.log(sqlQuery);
     // 執行查詢
     const res = await request.query(sqlQuery);
 
