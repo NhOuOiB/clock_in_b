@@ -4,7 +4,11 @@ const hrController = require('../controllers/hr');
 
 router.get('/getClockRecord', hrController.getClockRecord);
 
+router.get('/getClockRecordById/:id', hrController.getClockRecordById);
+
 router.post('/addClockRecord', hrController.addClockRecord);
+
+router.post('/makeUpClockIn', hrController.makeUpClockIn);
 
 router.put('/updateClockRecord', hrController.updateClockRecord);
 

@@ -25,7 +25,7 @@ async function getClockRecord(settlement_id, begin, end) {
       conditions.push('cr.out_time < @end');
       parameters.push({ name: 'end', type: DateTime, value: end });
     }
-    
+
     parameters.forEach((param) => request.input(param.name, param.type, param.value));
 
     // 構建 SQL 查詢
@@ -48,6 +48,32 @@ async function getClockRecord(settlement_id, begin, end) {
     INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id
     WHERE cr.enable = 1 ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
   ORDER BY cr.in_time DESC`;
+
+    // 執行查詢
+    const res = await request.query(sqlQuery);
+
+    return res.recordset;
+  } catch (error) {
+    console.log(error);
+    return { message: '伺服器錯誤' };
+  }
+}
+
+async function getClockRecordById(id) {
+  let connection = await pool.connect();
+  try {
+    const request = new mssql.Request(connection);
+
+    request.input('id', mssql.Int, id);
+
+    const sqlQuery = `
+    SELECT 
+    cr.in_time, 
+    cr.out_time 
+    FROM 
+    clock_record cr 
+    WHERE cr.id = @id
+    ORDER BY cr.in_time DESC`;
 
     // 執行查詢
     const res = await request.query(sqlQuery);
@@ -109,14 +135,70 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
   }
 }
 
-async function updateClockRecord(account, password, name, employee_id) {
+async function makeUpClockIn(id, individual_id, in_time, out_time) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
 
+    console.log(id);
+    request.input('employee_id', mssql.Int, id);
+    request.input('individual_id', mssql.VarChar, individual_id);
+    request.input('in_time', mssql.DateTime, in_time);
+    console.log(in_time);
+    console.log(out_time);
+    if (out_time != '') {
+      request.input('out_time', mssql.DateTime, out_time);
+    }
 
-    if (update_account.rowsAffected[0] == 1 && update_employee.rowsAffected[0] == 1) {
-      return { message: '更新成功' };
+    let already_clock_in = await request.query(
+      "SELECT id FROM clock_record WHERE employee_id = @employee_id AND individual_id = @individual_id AND in_time >= DATEADD(DAY, DATEDIFF(DAY, 0, @in_time), -1) + '23:00' AND in_time < DATEADD(DAY, DATEDIFF(DAY, 0, @in_time), 0) + '23:00'",
+    );
+    if (out_time == '') {
+      if (already_clock_in.recordset.length === 0) {
+        // clock record not exist, insert a new record
+        const res = await request.query(
+          'INSERT INTO clock_record (employee_id, individual_id, in_time, enable) VALUES (@employee_id, @individual_id, @in_time, 1)',
+        );
+
+        if (res.rowsAffected[0] !== 1) {
+          return { status: false, message: '打卡失敗' };
+        } else {
+          return { status: true, message: '打卡成功' };
+        }
+      } else {
+        // clock record exist
+
+        return { status: false, message: '已經有打卡紀錄了' };
+      }
+    } else {
+
+        const insert = await request.query('INSERT INTO clock_record (employee_id, individual_id, in_time, out_time, enable) VALUES (@employee_id, @individual_id, @in_time, @out_time, 1)');
+        if (insert.rowsAffected[0] !== 1) {
+          return { status: false, message: '打卡失敗' };
+        } else {
+          return { status: true, message: '打卡成功' };
+        }
+      
+    }
+  } catch (error) {
+    console.log(error);
+    return { status: false, message: '伺服器錯誤' };
+  }
+}
+
+async function updateClockRecord(id, in_time, out_time) {
+  let connection = await pool.connect();
+  try {
+    const request = new mssql.Request(connection);
+
+    request.input('id', mssql.Int, id);
+    request.input('in_time', mssql.DateTime, in_time);
+    request.input('out_time', mssql.DateTime, out_time);
+
+    let update_record = await request.query('UPDATE clock_record SET in_time = @in_time, out_time = @out_time WHERE id = @id');
+
+    if (update_record.rowsAffected[0] == 1 ) {
+      return { status: true, message: '更新成功' };
     }
   } catch (error) {
     console.log(error);
@@ -466,15 +548,13 @@ async function getSpecialCaseRecord(begin, end) {
       parameters.push({ name: 'end', type: DateTime, value: end });
     }
 
-
     parameters.forEach((param) => request.input(param.name, param.type, param.value));
-    
+
     let res = await request.query(
-      `SELECT scr.id, scr.[begin], scr.[end], sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON sc.special_case_id = scr.special_case_id WHERE sc.enable = 1 ${
+      `SELECT scr.id, scr.[begin], scr.[end], sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON sc.special_case_id = scr.special_case_id WHERE scr.enable = 1 ${
         conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''
       }`,
     );
-
 
     return res.recordset;
   } catch (error) {
@@ -511,7 +591,9 @@ async function getSettlement() {
 
 module.exports = {
   getClockRecord,
+  getClockRecordById,
   addClockRecord,
+  makeUpClockIn,
   updateClockRecord,
   deleteClockRecord,
   getEmployee,

@@ -7,6 +7,12 @@ async function getClockRecord(req, res) {
   res.json(data);
 }
 
+async function getClockRecordById(req, res) {
+  let { id } = req.params;
+  let data = await hrModel.getClockRecordById(id);
+  res.json(data);
+}
+
 async function addClockRecord(req, res) {
   let { id, individual_id, type, lat, lng } = req.body;
   let result = await hrModel.addClockRecord(id, individual_id, type, lat, lng);
@@ -14,9 +20,18 @@ async function addClockRecord(req, res) {
   res.json(result);
 }
 
+async function makeUpClockIn(req, res) {
+  let { id, individual_id, in_time, out_time } = req.body;
+  console.log(req.body);
+  let result = await hrModel.makeUpClockIn(id, individual_id, in_time, out_time);
+
+  res.json(result);
+}
+
 async function updateClockRecord(req, res) {
-  let { account, password, name, employee_id } = req.body;
-  let response = await hrModel.updateClockRecord(account, password, name, employee_id);
+  let { id, in_time, out_time } = req.body;
+  console.log(req.body);
+  let response = await hrModel.updateClockRecord(id, in_time, out_time);
   res.json(response);
 }
 
@@ -136,7 +151,9 @@ async function getSettlement(req, res) {
 
 module.exports = {
   getClockRecord,
+  getClockRecordById,
   addClockRecord,
+  makeUpClockIn,
   updateClockRecord,
   deleteClockRecord,
   getEmployee,
