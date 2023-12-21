@@ -35,7 +35,8 @@ async function getClockRecord(settlement_id, begin, end) {
     ic.individual_name, 
     ic.morning_wage, 
     ic.afternoon_wage, 
-    ic.night_wage, 
+    ic.night_wage,
+    t.type_name,
     e.name, 
     cr.id, 
     cr.in_lat_lng, 
@@ -46,6 +47,7 @@ async function getClockRecord(settlement_id, begin, end) {
     clock_record cr 
     INNER JOIN employee e ON cr.employee_id = e.employee_id 
     INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id
+    INNER JOIN type t ON ic.type_id = t.type_id
     WHERE cr.enable = 1 ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
   ORDER BY cr.in_time DESC`;
 
