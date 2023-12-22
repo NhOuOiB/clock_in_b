@@ -111,14 +111,14 @@ async function getSpecialRecordById(req, res) {
 }
 
 async function addSpecialRecord(req, res) {
-  let { special_case_id, begin, end } = req.body;
-  let response = await hrModel.addSpecialRecord(special_case_id, begin, end);
+  let { special_case_id, individual_id, begin, end } = req.body;
+  let response = await hrModel.addSpecialRecord(special_case_id, individual_id, begin, end);
   res.json(response);
 }
 
 async function updateSpecialRecord(req, res) {
-  let { id, special_case_id, begin, end } = req.body;
-  let response = await hrModel.updateSpecialRecord(id, special_case_id, begin, end);
+  let { id, special_case_id, individual_id, begin, end } = req.body;
+  let response = await hrModel.updateSpecialRecord(id, special_case_id, individual_id, begin, end);
   res.json(response);
 }
 

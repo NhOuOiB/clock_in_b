@@ -433,7 +433,7 @@ async function getSpecialRecord() {
     const request = new mssql.Request(connection);
 
     let res = await request.query(
-      'SELECT scr.id, scr.[begin], scr.[end], sc.special_case_name, sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON scr.special_case_id = sc.special_case_id WHERE scr.enable = 1 ORDER BY scr.[begin] DESC',
+      'SELECT scr.id, scr.individual_id, scr.[begin], scr.[end], sc.special_case_name, sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON scr.special_case_id = sc.special_case_id WHERE scr.enable = 1 ORDER BY scr.[begin] DESC',
     );
 
     return res.recordset;
@@ -451,7 +451,7 @@ async function getSpecialRecordById(id) {
     request.input('id', mssql.Int, id);
 
     let res = await request.query(
-      'SELECT scr.special_case_id, scr.[begin], scr.[end], sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON sc.special_case_id = scr.special_case_id WHERE scr.id = @id AND scr.enable = 1',
+      'SELECT scr.special_case_id, scr.individual_id, scr.[begin], scr.[end], sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON sc.special_case_id = scr.special_case_id WHERE scr.id = @id AND scr.enable = 1',
     );
 
     return res.recordset;
@@ -461,17 +461,18 @@ async function getSpecialRecordById(id) {
   }
 }
 
-async function addSpecialRecord(special_case_id, begin, end) {
+async function addSpecialRecord(special_case_id, individual_id, begin, end) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
 
     request.input('special_case_id', mssql.Int, special_case_id);
+    request.input('individual_id', mssql.VarChar, individual_id);
     request.input('begin', mssql.DateTime, begin);
     request.input('end', mssql.DateTime, end);
-
-    let response = await request.query('INSERT INTO special_case_record (special_case_id, [begin], [end]) VALUES (@special_case_id, @begin, @end)');
-
+    
+    let response = await request.query('INSERT INTO special_case_record (special_case_id, individual_id, [begin], [end]) VALUES (@special_case_id, @individual_id, @begin, @end)');
+    
     return { status: true, message: '新增成功' };
   } catch (error) {
     console.log(error);
@@ -479,17 +480,18 @@ async function addSpecialRecord(special_case_id, begin, end) {
   }
 }
 
-async function updateSpecialRecord(id, special_case_id, begin, end) {
+async function updateSpecialRecord(id, special_case_id, individual_id, begin, end) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
-
+    
     request.input('id', mssql.Int, id);
     request.input('special_case_id', mssql.Int, special_case_id);
+    request.input('individual_id', mssql.VarChar, individual_id);
     request.input('begin', mssql.DateTime, begin);
     request.input('end', mssql.DateTime, end);
 
-    let update_individual = await request.query('UPDATE special_case_record SET special_case_id = @special_case_id, [begin] = @begin, [end] = @end WHERE id = @id');
+    let update_individual = await request.query('UPDATE special_case_record SET special_case_id = @special_case_id, individual_id = @individual_id, [begin] = @begin, [end] = @end WHERE id = @id');
     if (update_individual.rowsAffected[0] == 1) {
       return { status: true, message: '更新成功' };
     }
@@ -553,7 +555,7 @@ async function getSpecialCaseRecord(begin, end) {
     parameters.forEach((param) => request.input(param.name, param.type, param.value));
 
     let res = await request.query(
-      `SELECT scr.id, scr.[begin], scr.[end], sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON sc.special_case_id = scr.special_case_id WHERE scr.enable = 1 ${
+      `SELECT scr.id, scr.individual_id, scr.[begin], scr.[end], sc.multiple FROM special_case_record scr INNER JOIN special_case sc ON sc.special_case_id = scr.special_case_id WHERE scr.enable = 1 ${
         conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''
       }`,
     );
