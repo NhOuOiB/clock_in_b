@@ -32,13 +32,13 @@ router.post('/login', async (req, res) => {
       let users = result.recordset;
 
       if (users.length == 0) {
-        return res.status(401).json({ message: '信箱或密碼錯誤' });
+        return res.status(401).json({ message: '帳號或密碼錯誤' });
       }
 
       let user = users[0];
 
       let payload = {
-        id: user.id,
+        id: user.employee_id,
         name: user.name,
         individual_id: individual.individual_id,
         permission: user.permission,
