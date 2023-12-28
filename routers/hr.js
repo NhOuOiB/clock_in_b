@@ -6,6 +6,8 @@ router.get('/getClockRecord', hrController.getClockRecord);
 
 router.get('/getClockRecordById/:id', hrController.getClockRecordById);
 
+router.get('/getClockRecordByEmployee', hrController.getClockRecordByEmployee);
+
 router.post('/addClockRecord', hrController.addClockRecord);
 
 router.post('/makeUpClockIn', hrController.makeUpClockIn);

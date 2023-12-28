@@ -13,6 +13,12 @@ async function getClockRecordById(req, res) {
   res.json(data);
 }
 
+async function getClockRecordByEmployee(req, res) {
+  let { employee_id } = req.query;
+  let data = await hrModel.getClockRecordByEmployee(employee_id);
+  res.json(data);
+}
+
 async function addClockRecord(req, res) {
   let { id, individual_id, type, lat, lng } = req.body;
   let result = await hrModel.addClockRecord(id, individual_id, type, lat, lng);
@@ -152,6 +158,7 @@ async function getSettlement(req, res) {
 module.exports = {
   getClockRecord,
   getClockRecordById,
+  getClockRecordByEmployee,
   addClockRecord,
   makeUpClockIn,
   updateClockRecord,

@@ -87,6 +87,45 @@ async function getClockRecordById(id) {
   }
 }
 
+async function getClockRecordByEmployee(employee_id) {
+  let connection = await pool.connect();
+  try {
+    const request = new mssql.Request(connection);
+
+    request.input('employee_id', mssql.Int, employee_id);
+
+    const sqlQuery = `
+    SELECT 
+    ic.individual_id, 
+    ic.individual_name, 
+    ic.morning_wage, 
+    ic.afternoon_wage, 
+    ic.night_wage,
+    t.type_name,
+    e.name, 
+    cr.id, 
+    cr.in_lat_lng, 
+    cr.out_lat_lng, 
+    cr.in_time, 
+    cr.out_time 
+  FROM 
+    clock_record cr 
+    INNER JOIN employee e ON cr.employee_id = e.employee_id 
+    INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id
+    INNER JOIN type t ON ic.type_id = t.type_id
+    WHERE cr.enable = 1 AND cr.employee_id = @employee_id
+  ORDER BY cr.in_time DESC`;
+
+    // 執行查詢
+    const res = await request.query(sqlQuery);
+
+    return res.recordset;
+  } catch (error) {
+    console.log(error);
+    return { message: '伺服器錯誤' };
+  }
+}
+
 async function addClockRecord(id, individual_id, type, lat, lng) {
   let connection = await pool.connect();
   try {
@@ -596,6 +635,7 @@ async function getSettlement() {
 module.exports = {
   getClockRecord,
   getClockRecordById,
+  getClockRecordByEmployee,
   addClockRecord,
   makeUpClockIn,
   updateClockRecord,
