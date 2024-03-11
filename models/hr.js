@@ -181,12 +181,9 @@ async function makeUpClockIn(id, individual_id, in_time, out_time) {
   try {
     const request = new mssql.Request(connection);
 
-    console.log(id);
     request.input('employee_id', mssql.Int, id);
     request.input('individual_id', mssql.VarChar, individual_id);
     request.input('in_time', mssql.DateTime, in_time);
-    console.log(in_time);
-    console.log(out_time);
     if (out_time != '') {
       request.input('out_time', mssql.DateTime, out_time);
     }
@@ -197,9 +194,7 @@ async function makeUpClockIn(id, individual_id, in_time, out_time) {
     if (out_time == '') {
       if (already_clock_in.recordset.length === 0) {
         // clock record not exist, insert a new record
-        const res = await request.query(
-          'INSERT INTO clock_record (employee_id, individual_id, in_time, enable) VALUES (@employee_id, @individual_id, @in_time, 1)',
-        );
+        const res = await request.query('INSERT INTO clock_record (employee_id, individual_id, in_time, enable) VALUES (@employee_id, @individual_id, @in_time, 1)');
 
         if (res.rowsAffected[0] !== 1) {
           return { status: false, message: '打卡失敗' };
@@ -212,14 +207,14 @@ async function makeUpClockIn(id, individual_id, in_time, out_time) {
         return { status: false, message: '已經有打卡紀錄了' };
       }
     } else {
-
-        const insert = await request.query('INSERT INTO clock_record (employee_id, individual_id, in_time, out_time, enable) VALUES (@employee_id, @individual_id, @in_time, @out_time, 1)');
-        if (insert.rowsAffected[0] !== 1) {
-          return { status: false, message: '打卡失敗' };
-        } else {
-          return { status: true, message: '打卡成功' };
-        }
-      
+      const insert = await request.query(
+        'INSERT INTO clock_record (employee_id, individual_id, in_time, out_time, enable) VALUES (@employee_id, @individual_id, @in_time, @out_time, 1)',
+      );
+      if (insert.rowsAffected[0] !== 1) {
+        return { status: false, message: '打卡失敗' };
+      } else {
+        return { status: true, message: '打卡成功' };
+      }
     }
   } catch (error) {
     console.log(error);
@@ -238,7 +233,7 @@ async function updateClockRecord(id, in_time, out_time) {
 
     let update_record = await request.query('UPDATE clock_record SET in_time = @in_time, out_time = @out_time WHERE id = @id');
 
-    if (update_record.rowsAffected[0] == 1 ) {
+    if (update_record.rowsAffected[0] == 1) {
       return { status: true, message: '更新成功' };
     }
   } catch (error) {
@@ -286,7 +281,7 @@ async function getEmployeeById(employee_id) {
     request.input('employee_id', mssql.Int, employee_id);
 
     let res = await request.query(
-      'SELECT a.account, a.password, e.employee_id, e.name FROM account a INNER JOIN employee e ON a.employee_id = e.employee_id WHERE a.employee_id = @employee_id AND e.enable = 1',
+      'SELECT a.id, a.account, a.password, e.employee_id, e.name FROM account a INNER JOIN employee e ON a.employee_id = e.employee_id WHERE a.employee_id = @employee_id AND e.enable = 1',
     );
 
     return res.recordset;
@@ -305,6 +300,14 @@ async function addEmployee(account, password, name) {
     request.input('password', mssql.VarChar, password);
     request.input('name', mssql.VarChar, name);
 
+    // 驗證
+    let acc_exsisted = await request.query('SELECT * FROM account a INNER JOIN employee e ON a.employee_id = e.employee_id  WHERE a.account = @account AND e.enable = 1');
+
+    if (acc_exsisted.recordset.length > 0) {
+      return { status: false, message: '帳號重複' };
+    }
+
+    // 新增
     let emp = await request.query('INSERT INTO employee (name) VALUES (@name)');
     let employee_id = await request.query('SELECT employee_id FROM employee WHERE name = @name');
 
@@ -313,37 +316,45 @@ async function addEmployee(account, password, name) {
     let acc = await request.query('INSERT INTO account (account, password, permission, employee_id ) VALUES (@account, @password, 1, @employee_id)');
 
     if (emp.rowsAffected[0] != 1) {
-      return { message: 'emp新增失敗' };
+      return { status: false, message: '員工新增失敗' };
     }
     if (acc.rowsAffected[0] != 1) {
-      return { message: 'acc新增失敗' };
+      return { status: false, message: '帳號新增失敗' };
     }
 
-    return { message: '新增成功' };
+    return { status: true, message: '新增成功' };
   } catch (error) {
     console.log(error);
-    return { message: '伺服器錯誤' };
+    return { status: false, message: '伺服器錯誤' };
   }
 }
 
-async function updateEmployee(account, password, name, employee_id) {
+async function updateEmployee(id, account, password, name, employee_id) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
-
-    request.input('account', mssql.VarChar, account);
-    request.input('password', mssql.VarChar, password);
-    request.input('name', mssql.VarChar, name);
+    request.input('id', mssql.Int, id);
+    request.input('account', mssql.VarChar, account.trim());
+    request.input('password', mssql.VarChar, password.trim());
+    request.input('name', mssql.VarChar, name.trim());
     request.input('employee_id', mssql.Int, employee_id);
 
+    // 驗證
+    let acc_exsisted = await request.query('SELECT * FROM account a INNER JOIN employee e ON a.employee_id = e.employee_id  WHERE a.account = @account AND e.enable = 1');
+
+    if (acc_exsisted.recordset[0]?.id !== id && acc_exsisted.recordset[0]?.account.trim() === account.trim()) {
+      return { status: false, message: '帳號重複' };
+    }
+
+    // 更新
     let update_account = await request.query('UPDATE account SET account = @account, password = @password WHERE employee_id = @employee_id');
     let update_employee = await request.query('UPDATE employee SET name = @name WHERE employee_id = @employee_id');
     if (update_account.rowsAffected[0] == 1 && update_employee.rowsAffected[0] == 1) {
-      return { message: '更新成功' };
+      return { status: true, message: '更新成功' };
     }
   } catch (error) {
     console.log(error);
-    return { message: '伺服器錯誤' };
+    return { status: false, message: '伺服器錯誤' };
   }
 }
 
@@ -509,9 +520,9 @@ async function addSpecialRecord(special_case_id, individual_id, begin, end) {
     request.input('individual_id', mssql.VarChar, individual_id);
     request.input('begin', mssql.DateTime, begin);
     request.input('end', mssql.DateTime, end);
-    
+
     let response = await request.query('INSERT INTO special_case_record (special_case_id, individual_id, [begin], [end]) VALUES (@special_case_id, @individual_id, @begin, @end)');
-    
+
     return { status: true, message: '新增成功' };
   } catch (error) {
     console.log(error);
@@ -523,14 +534,16 @@ async function updateSpecialRecord(id, special_case_id, individual_id, begin, en
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
-    
+
     request.input('id', mssql.Int, id);
     request.input('special_case_id', mssql.Int, special_case_id);
     request.input('individual_id', mssql.VarChar, individual_id);
     request.input('begin', mssql.DateTime, begin);
     request.input('end', mssql.DateTime, end);
 
-    let update_individual = await request.query('UPDATE special_case_record SET special_case_id = @special_case_id, individual_id = @individual_id, [begin] = @begin, [end] = @end WHERE id = @id');
+    let update_individual = await request.query(
+      'UPDATE special_case_record SET special_case_id = @special_case_id, individual_id = @individual_id, [begin] = @begin, [end] = @end WHERE id = @id',
+    );
     if (update_individual.rowsAffected[0] == 1) {
       return { status: true, message: '更新成功' };
     }

@@ -28,7 +28,6 @@ async function addClockRecord(req, res) {
 
 async function makeUpClockIn(req, res) {
   let { id, individual_id, in_time, out_time } = req.body;
-  console.log(req.body);
   let result = await hrModel.makeUpClockIn(id, individual_id, in_time, out_time);
 
   res.json(result);
@@ -36,7 +35,6 @@ async function makeUpClockIn(req, res) {
 
 async function updateClockRecord(req, res) {
   let { id, in_time, out_time } = req.body;
-  console.log(req.body);
   let response = await hrModel.updateClockRecord(id, in_time, out_time);
   res.json(response);
 }
@@ -65,8 +63,8 @@ async function addEmployee(req, res) {
 }
 
 async function updateEmployee(req, res) {
-  let { account, password, name, employee_id } = req.body;
-  let response = await hrModel.updateEmployee(account, password, name, employee_id);
+  let { id, account, password, name, employee_id } = req.body;
+  let response = await hrModel.updateEmployee(id, account, password, name, employee_id);
   res.json(response);
 }
 
