@@ -313,7 +313,7 @@ async function addEmployee(account, password, name) {
 
     request.input('employee_id', mssql.Int, employee_id.recordset[employee_id.recordset.length - 1].employee_id);
 
-    let acc = await request.query('INSERT INTO account (account, password, permission, employee_id ) VALUES (@account, @password, 1, @employee_id)');
+    let acc = await request.query('INSERT INTO account (account, password, permission, employee_id ) VALUES (@account, @password, 2, @employee_id)');
 
     if (emp.rowsAffected[0] != 1) {
       return { status: false, message: '員工新增失敗' };
