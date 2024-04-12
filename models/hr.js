@@ -1,7 +1,8 @@
 const pool = require('../utils/db');
 const mssql = require('mssql');
+const moment = require('moment');
 
-async function getClockRecord(settlement_id, begin, end, individual_id) {
+async function getClockRecord(settlement_id, settlement_type, begin, end, individual_id) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
@@ -17,18 +18,26 @@ async function getClockRecord(settlement_id, begin, end, individual_id) {
     }
 
     if (begin !== '') {
-      conditions.push('cr.in_time > @begin');
+      if (settlement_type == 1) {
+        conditions.push('cr.in_time >= @begin');
+      } else if (settlement_type == 2) {
+        conditions.push('cr.out_time > @begin');
+      }
       parameters.push({ name: 'begin', type: DateTime, value: begin });
     }
 
     if (end !== '') {
-      conditions.push('cr.out_time < @end');
+      if (settlement_type == 1) {
+        conditions.push(`FORMAT(cr.in_time, 'yyyy-MM-dd HH:mm') <= @end`);
+      } else if (settlement_type == 2) {
+        conditions.push(`FORMAT(cr.out_time, 'yyyy-MM-dd HH:mm') <= @end`);
+      }
       parameters.push({ name: 'end', type: DateTime, value: end });
     }
-    
+
     if (individual_id !== '') {
       conditions.push("ic.individual_id LIKE @individual_id + '%'");
-      parameters.push({ name: 'individual_id', type: mssql.VarChar, value: individual_id });  
+      parameters.push({ name: 'individual_id', type: mssql.VarChar, value: individual_id });
     }
 
     parameters.forEach((param) => request.input(param.name, param.type, param.value));
@@ -61,7 +70,6 @@ async function getClockRecord(settlement_id, begin, end, individual_id) {
 
     return res.recordset;
   } catch (error) {
-    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
@@ -87,7 +95,6 @@ async function getClockRecordById(id) {
 
     return res.recordset;
   } catch (error) {
-    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
@@ -126,7 +133,6 @@ async function getClockRecordByEmployee(employee_id) {
 
     return res.recordset;
   } catch (error) {
-    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
@@ -143,10 +149,10 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     request.input('latlng', mssql.VarChar, `${lat}, ${lng}`);
 
     let already_clock_in = await request.query(
-      "SELECT id FROM clock_record WHERE employee_id = @employee_id AND individual_id = @individual_id AND in_time >= DATEADD(DAY, DATEDIFF(DAY, 0, @now), -1) + '23:00' AND in_time < DATEADD(DAY, DATEDIFF(DAY, 0, @now), 0) + '23:00'",
+      "SELECT TOP 1 id, in_time, out_time FROM clock_record WHERE employee_id = @employee_id AND individual_id = @individual_id AND in_time >= DATEADD(DAY, DATEDIFF(DAY, 0, @now), -1) + '23:00' AND in_time < DATEADD(DAY, DATEDIFF(DAY, 0, @now), 0) + '23:00' ORDER BY id DESC",
     );
     if (type == '上班') {
-      if (already_clock_in.recordset.length === 0) {
+      if (already_clock_in.recordset.length === 0 || already_clock_in.recordset[0].out_time !== null) {
         // clock record not exist, insert a new record
         const res = await request.query(
           'INSERT INTO clock_record (employee_id, individual_id, in_time, in_lat_lng, enable) VALUES (@employee_id, @individual_id, @now, @latlng, 1)',
@@ -160,10 +166,10 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
       } else {
         // clock record exist
 
-        return { status: false, message: '已經有打卡紀錄了' };
+        return { status: false, message: '上次打卡紀錄還沒有下班' };
       }
     } else {
-      if (already_clock_in.recordset.length === 0) {
+      if (already_clock_in.recordset[0].out_time !== null) {
         return { status: false, message: '沒有上班紀錄不能打下班卡' };
       } else {
         request.input('id', mssql.Int, already_clock_in.recordset[0].id);
@@ -176,7 +182,6 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
       }
     }
   } catch (error) {
-    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
@@ -222,7 +227,6 @@ async function makeUpClockIn(id, individual_id, in_time, out_time) {
       }
     }
   } catch (error) {
-    console.log(error);
     return { status: false, message: '伺服器錯誤' };
   }
 }
@@ -242,7 +246,6 @@ async function updateClockRecord(id, in_time, out_time) {
       return { status: true, message: '更新成功' };
     }
   } catch (error) {
-    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
@@ -257,23 +260,33 @@ async function deleteClockRecord(id) {
 
     if (update_account.rowsAffected[0] == 1) return { message: '刪除成功' };
   } catch (error) {
-    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
 
-async function getEmployee() {
+async function getEmployee(employee_name) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
 
-    let res = await request.query(
-      'SELECT a.account, a.password, e.employee_id, e.name FROM account a INNER JOIN employee e ON a.employee_id = e.employee_id WHERE e.enable = 1 ORDER BY e.name ASC',
-    );
+    let conditions = [];
+    let parameters = [];
+
+    if (employee_name !== '') {
+      conditions.push("e.name LIKE @employee_name + '%'");
+      parameters.push({ name: 'employee_name', type: mssql.VarChar, value: employee_name });
+    }
+
+    let sqlQuery = `SELECT a.account, a.password, e.employee_id, e.name FROM account a INNER JOIN employee e ON a.employee_id = e.employee_id WHERE e.enable = 1 ${
+      conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''
+      } ORDER BY e.name ASC`;
+    
+    parameters.forEach((param) => request.input(param.name, param.type, param.value));
+
+    let res = await request.query(sqlQuery);
 
     return res.recordset;
   } catch (error) {
-    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
@@ -291,7 +304,6 @@ async function getEmployeeById(employee_id) {
 
     return res.recordset;
   } catch (error) {
-    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }

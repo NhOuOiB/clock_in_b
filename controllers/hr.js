@@ -2,8 +2,8 @@ const hrModel = require('../models/hr');
 const moment = require('moment');
 
 async function getClockRecord(req, res) {
-  let { settlement_id, begin, end, individual_id } = req.query;
-  let data = await hrModel.getClockRecord(settlement_id, begin, end, individual_id);
+  let { settlement_id, settlement_type, begin, end, individual_id } = req.query;
+  let data = await hrModel.getClockRecord(settlement_id, settlement_type, begin, end, individual_id);
   res.json(data);
 }
 
@@ -46,7 +46,8 @@ async function deleteClockRecord(req, res) {
 }
 
 async function getEmployee(req, res) {
-  let data = await hrModel.getEmployee();
+  let { employee_name } = req.query;
+  let data = await hrModel.getEmployee(employee_name);
   res.json(data);
 }
 
