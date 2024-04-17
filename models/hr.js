@@ -2,7 +2,7 @@ const pool = require('../utils/db');
 const mssql = require('mssql');
 const moment = require('moment');
 
-async function getClockRecord(settlement_id, settlement_type, begin, end, individual_id) {
+async function getClockRecord(settlement_id, settlement_type, begin, end, individual_id, page, pageSize) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
@@ -11,6 +11,9 @@ async function getClockRecord(settlement_id, settlement_type, begin, end, indivi
     // 創建查詢條件
     const conditions = [];
     const parameters = [];
+
+    parameters.push({ name: 'pageSize', type: mssql.Int, value: pageSize });
+    parameters.push({ name: 'page', type: mssql.Int, value: (page - 1) * pageSize });
 
     if (settlement_id !== '') {
       conditions.push('ic.settlement_id = @settlement_id');
@@ -42,6 +45,28 @@ async function getClockRecord(settlement_id, settlement_type, begin, end, indivi
 
     parameters.forEach((param) => request.input(param.name, param.type, param.value));
 
+    const countSqlQuery = `SELECT 
+    ic.individual_id, 
+    ic.individual_name, 
+    ic.morning_wage, 
+    ic.afternoon_wage, 
+    ic.night_wage,
+    t.type_name,
+    e.name, 
+    cr.id, 
+    cr.in_lat_lng, 
+    cr.out_lat_lng, 
+    cr.in_time, 
+    cr.out_time 
+  FROM 
+    clock_record cr 
+    INNER JOIN employee e ON cr.employee_id = e.employee_id 
+    INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id
+    INNER JOIN type t ON ic.type_id = t.type_id
+    WHERE cr.enable = 1 ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
+  ORDER BY cr.in_time DESC
+  `;
+
     // 構建 SQL 查詢
     const sqlQuery = `
   SELECT 
@@ -63,12 +88,13 @@ async function getClockRecord(settlement_id, settlement_type, begin, end, indivi
     INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id
     INNER JOIN type t ON ic.type_id = t.type_id
     WHERE cr.enable = 1 ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
-  ORDER BY cr.in_time DESC`;
+  ORDER BY cr.in_time DESC OFFSET @page ROWS FETCH NEXT @pageSize ROWS ONLY`;
 
     // 執行查詢
     const res = await request.query(sqlQuery);
+    const countRes = await request.query(countSqlQuery);
 
-    return res.recordset;
+    return { totalData: countRes.recordset, data: res.recordset };
   } catch (error) {
     return { message: '伺服器錯誤' };
   }
@@ -99,12 +125,38 @@ async function getClockRecordById(id) {
   }
 }
 
-async function getClockRecordByEmployee(employee_id) {
+async function getClockRecordByEmployee(individual_id, page, pageSize) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
+    const twoMonthsAgo = moment().subtract(2, 'month').format('YYYY-MM-DD HH:mm:ss');
 
-    request.input('employee_id', mssql.Int, employee_id);
+    request.input('individual_id', mssql.VarChar, individual_id);
+    request.input('pageSize', mssql.Int, pageSize);
+    request.input('page', mssql.Int, (page - 1) * pageSize);
+    request.input('twoMonthsAgo', mssql.DateTime, twoMonthsAgo)
+
+    const sqlQueryAllData = `
+    SELECT 
+    ic.individual_id, 
+    ic.individual_name, 
+    ic.morning_wage, 
+    ic.afternoon_wage, 
+    ic.night_wage,
+    t.type_name,
+    e.name, 
+    cr.id, 
+    cr.in_lat_lng, 
+    cr.out_lat_lng, 
+    cr.in_time, 
+    cr.out_time 
+  FROM 
+    clock_record cr 
+    INNER JOIN employee e ON cr.employee_id = e.employee_id 
+    INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id
+    INNER JOIN type t ON ic.type_id = t.type_id
+    WHERE cr.enable = 1 AND cr.individual_id = @individual_id AND cr.in_time > @twoMonthsAgo
+  ORDER BY cr.in_time DESC`;
 
     const sqlQuery = `
     SELECT 
@@ -125,13 +177,14 @@ async function getClockRecordByEmployee(employee_id) {
     INNER JOIN employee e ON cr.employee_id = e.employee_id 
     INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id
     INNER JOIN type t ON ic.type_id = t.type_id
-    WHERE cr.enable = 1 AND cr.employee_id = @employee_id
-  ORDER BY cr.in_time DESC`;
+    WHERE cr.enable = 1 AND cr.individual_id = @individual_id AND cr.in_time > @twoMonthsAgo
+  ORDER BY cr.in_time DESC OFFSET @page ROWS FETCH NEXT @pageSize ROWS ONLY`;
 
     // 執行查詢
+    const resAllData = await request.query(sqlQueryAllData);
     const res = await request.query(sqlQuery);
 
-    return res.recordset;
+    return { totalData: resAllData.recordset, data: res.recordset };
   } catch (error) {
     return { message: '伺服器錯誤' };
   }
@@ -264,7 +317,7 @@ async function deleteClockRecord(id) {
   }
 }
 
-async function getEmployee(employee_name) {
+async function getEmployee(employee_name, page, pageSize) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
@@ -272,20 +325,28 @@ async function getEmployee(employee_name) {
     let conditions = [];
     let parameters = [];
 
+    parameters.push({ name: 'pageSize', type: mssql.Int, value: pageSize });
+    parameters.push({ name: 'page', type: mssql.Int, value: (page - 1) * pageSize });
+
     if (employee_name !== '') {
       conditions.push("e.name LIKE @employee_name + '%'");
       parameters.push({ name: 'employee_name', type: mssql.VarChar, value: employee_name });
     }
 
+    let countSqlQuery = `SELECT COUNT(*) AS count FROM account a INNER JOIN employee e ON a.employee_id = e.employee_id WHERE e.enable = 1 ${
+      conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''
+    }`;
+
     let sqlQuery = `SELECT a.account, a.password, e.employee_id, e.name FROM account a INNER JOIN employee e ON a.employee_id = e.employee_id WHERE e.enable = 1 ${
       conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''
-      } ORDER BY e.name ASC`;
-    
+    } ORDER BY e.name ASC OFFSET @page ROWS FETCH NEXT @pageSize ROWS ONLY`;
+
     parameters.forEach((param) => request.input(param.name, param.type, param.value));
 
+    let countRes = await request.query(countSqlQuery);
     let res = await request.query(sqlQuery);
 
-    return res.recordset;
+    return { count: countRes.recordset[0].count, data: res.recordset };
   } catch (error) {
     return { message: '伺服器錯誤' };
   }
@@ -391,16 +452,36 @@ async function deleteEmployee(employee_id) {
   }
 }
 
-async function getIndividual() {
+async function getIndividual(individual_name, page, pageSize) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
 
-    let res = await request.query(
-      'SELECT ic.individual_id, ic.individual_name, s.settlement_name, t.type_name FROM individual_case ic INNER JOIN settlement s ON ic.settlement_id = s.settlement_id INNER JOIN type t ON ic.type_id = t.type_id WHERE ic.enable = 1 ORDER BY ic.individual_name ASC',
-    );
+    let parameters = [];
+    let conditions = [];
 
-    return res.recordset;
+    if (individual_name !== '') {
+      conditions.push("ic.individual_name LIKE @individual_name + '%'");
+      parameters.push({ name: 'individual_name', type: mssql.VarChar, value: individual_name });
+    }
+
+    parameters.push({ name: 'pageSize', type: mssql.Int, value: pageSize });
+    parameters.push({ name: 'page', type: mssql.Int, value: (page - 1) * pageSize });
+
+    let countSqlQuery = `SELECT COUNT(*) AS count FROM individual_case ic INNER JOIN settlement s ON ic.settlement_id = s.settlement_id INNER JOIN type t ON ic.type_id = t.type_id WHERE ic.enable = 1 ${
+      conditions.length > 0 ? 'AND ' + conditions.join(' AND') : ''
+    }`;
+
+    let sqlQuery = `SELECT ic.individual_id, ic.individual_name, s.settlement_name, t.type_name FROM individual_case ic INNER JOIN settlement s ON ic.settlement_id = s.settlement_id INNER JOIN type t ON ic.type_id = t.type_id WHERE ic.enable = 1 ${
+      conditions.length > 0 ? 'AND ' + conditions.join(' AND') : ''
+    } ORDER BY ic.individual_name ASC OFFSET @page ROWS FETCH NEXT @pageSize ROWS ONLY`;
+
+    parameters.forEach((param) => request.input(param.name, param.type, param.value));
+
+    let countRes = await request.query(countSqlQuery);
+    let res = await request.query(sqlQuery);
+
+    return { count: countRes.recordset[0].count, data: res.recordset };
   } catch (error) {
     console.log(error);
     return { message: '伺服器錯誤' };
