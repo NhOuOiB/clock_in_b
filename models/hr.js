@@ -39,7 +39,7 @@ async function getClockRecord(settlement_id, settlement_type, begin, end, indivi
     }
 
     if (individual_id !== '') {
-      conditions.push("ic.individual_id LIKE @individual_id + '%'");
+      conditions.push("ic.individual_id LIKE '%' + @individual_id + '%'");
       parameters.push({ name: 'individual_id', type: mssql.VarChar, value: individual_id });
     }
 
@@ -63,7 +63,7 @@ async function getClockRecord(settlement_id, settlement_type, begin, end, indivi
     INNER JOIN employee e ON cr.employee_id = e.employee_id 
     INNER JOIN individual_case ic ON cr.individual_id = ic.individual_id
     INNER JOIN type t ON ic.type_id = t.type_id
-    WHERE cr.enable = 1 ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
+    WHERE cr.enable = 1 AND cr.out_time IS NOT NULL ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
   ORDER BY cr.in_time DESC
   `;
 
@@ -202,7 +202,7 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     request.input('latlng', mssql.VarChar, `${lat}, ${lng}`);
 
     let already_clock_in = await request.query(
-      "SELECT TOP 1 id, in_time, out_time FROM clock_record WHERE employee_id = @employee_id AND individual_id = @individual_id AND in_time >= DATEADD(DAY, DATEDIFF(DAY, 0, @now), -1) + '23:00' AND in_time < DATEADD(DAY, DATEDIFF(DAY, 0, @now), 0) + '23:00' ORDER BY id DESC",
+      "SELECT TOP 1 id, in_time, out_time FROM clock_record WHERE employee_id = @employee_id AND individual_id = @individual_id ORDER BY id DESC",
     );
     if (type == '上班') {
       if (already_clock_in.recordset.length === 0 || already_clock_in.recordset[0].out_time !== null) {
@@ -222,9 +222,7 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
         return { status: false, message: '上次打卡紀錄還沒有下班' };
       }
     } else {
-      if (already_clock_in.recordset[0].out_time !== null) {
-        return { status: false, message: '沒有上班紀錄不能打下班卡' };
-      } else {
+      if (already_clock_in.recordset.length !== 0 && already_clock_in.recordset[0].out_time === null) {
         request.input('id', mssql.Int, already_clock_in.recordset[0].id);
         const update_record = await request.query('UPDATE clock_record SET out_time = @now, out_lat_lng = @latlng WHERE id = @id');
         if (update_record.rowsAffected[0] !== 1) {
@@ -232,9 +230,12 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
         } else {
           return { status: true, message: '打卡成功' };
         }
+      } else {
+        return { status: false, message: '沒有上班紀錄不能打下班卡' };
       }
     }
   } catch (error) {
+    console.log(error)
     return { message: '伺服器錯誤' };
   }
 }
@@ -288,6 +289,9 @@ async function updateClockRecord(id, in_time, out_time) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
+    console.log(id);
+    console.log(in_time);
+    console.log(out_time);
 
     request.input('id', mssql.Int, id);
     request.input('in_time', mssql.DateTime, in_time);
@@ -329,7 +333,7 @@ async function getEmployee(employee_name, page, pageSize) {
     parameters.push({ name: 'page', type: mssql.Int, value: (page - 1) * pageSize });
 
     if (employee_name !== '') {
-      conditions.push("e.name LIKE @employee_name + '%'");
+      conditions.push("e.name LIKE '%' + @employee_name + '%'");
       parameters.push({ name: 'employee_name', type: mssql.VarChar, value: employee_name });
     }
 
@@ -461,7 +465,7 @@ async function getIndividual(individual_name, page, pageSize) {
     let conditions = [];
 
     if (individual_name !== '') {
-      conditions.push("ic.individual_name LIKE @individual_name + '%'");
+      conditions.push("ic.individual_name LIKE '%' + @individual_name + '%'");
       parameters.push({ name: 'individual_name', type: mssql.VarChar, value: individual_name });
     }
 
