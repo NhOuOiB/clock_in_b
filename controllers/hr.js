@@ -2,8 +2,8 @@ const hrModel = require('../models/hr');
 const moment = require('moment');
 
 async function getClockRecord(req, res) {
-  let { settlement_id, settlement_type, begin, end, individual_id, page, pageSize } = req.query;
-  let data = await hrModel.getClockRecord(settlement_id, settlement_type, begin, end, individual_id, page, pageSize);
+  let { settlement_id, settlement_type, begin, end, individual_id, individual_name, employee_name, page, pageSize } = req.query;
+  let data = await hrModel.getClockRecord(settlement_id, settlement_type, begin, end, individual_id, individual_name, employee_name, page, pageSize);
   res.json(data);
 }
 

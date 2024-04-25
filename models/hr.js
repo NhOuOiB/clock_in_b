@@ -2,7 +2,7 @@ const pool = require('../utils/db');
 const mssql = require('mssql');
 const moment = require('moment');
 
-async function getClockRecord(settlement_id, settlement_type, begin, end, individual_id, page, pageSize) {
+async function getClockRecord(settlement_id, settlement_type, begin, end, individual_id, individual_name, employee_name, page, pageSize) {
   let connection = await pool.connect();
   try {
     const request = new mssql.Request(connection);
@@ -41,6 +41,16 @@ async function getClockRecord(settlement_id, settlement_type, begin, end, indivi
     if (individual_id !== '') {
       conditions.push("ic.individual_id LIKE '%' + @individual_id + '%'");
       parameters.push({ name: 'individual_id', type: mssql.VarChar, value: individual_id });
+    }
+
+    if (individual_name !== '') {
+      conditions.push("ic.individual_name LIKE '%' + @individual_name + '%'");
+      parameters.push({ name: 'individual_name', type: mssql.VarChar, value: individual_name });
+    }
+
+    if (employee_name !== '') {
+      conditions.push("e.name LIKE '%' + @employee_name + '%'");
+      parameters.push({ name: 'employee_name', type: mssql.VarChar, value: employee_name });
     }
 
     parameters.forEach((param) => request.input(param.name, param.type, param.value));
