@@ -3,8 +3,9 @@ const mssql = require('mssql');
 const moment = require('moment');
 
 async function getClockRecord(settlement_id, settlement_type, begin, end, individual_id, individual_name, employee_name, page, pageSize) {
-  let connection = await pool.connect();
   try {
+    console.log('getClockRecord');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
     const { DateTime, Int } = mssql;
 
@@ -106,13 +107,15 @@ async function getClockRecord(settlement_id, settlement_type, begin, end, indivi
 
     return { totalData: countRes.recordset, data: res.recordset };
   } catch (error) {
+    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
 
 async function getClockRecordById(id) {
-  let connection = await pool.connect();
   try {
+    console.log('getClockRecordById');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('id', mssql.Int, id);
@@ -131,20 +134,22 @@ async function getClockRecordById(id) {
 
     return res.recordset;
   } catch (error) {
+    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
 
 async function getClockRecordByEmployee(individual_id, page, pageSize) {
-  let connection = await pool.connect();
   try {
+    console.log('getClockRecordByEmployee');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
     const twoMonthsAgo = moment().subtract(2, 'month').format('YYYY-MM-DD HH:mm:ss');
 
     request.input('individual_id', mssql.VarChar, individual_id);
     request.input('pageSize', mssql.Int, pageSize);
     request.input('page', mssql.Int, (page - 1) * pageSize);
-    request.input('twoMonthsAgo', mssql.DateTime, twoMonthsAgo)
+    request.input('twoMonthsAgo', mssql.DateTime, twoMonthsAgo);
 
     const sqlQueryAllData = `
     SELECT 
@@ -196,13 +201,15 @@ async function getClockRecordByEmployee(individual_id, page, pageSize) {
 
     return { totalData: resAllData.recordset, data: res.recordset };
   } catch (error) {
+    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
 
 async function addClockRecord(id, individual_id, type, lat, lng) {
-  let connection = await pool.connect();
   try {
+    console.log('addClockRecord');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
     const now = new Date();
 
@@ -212,7 +219,7 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     request.input('latlng', mssql.VarChar, `${lat}, ${lng}`);
 
     let already_clock_in = await request.query(
-      "SELECT TOP 1 id, in_time, out_time FROM clock_record WHERE employee_id = @employee_id AND individual_id = @individual_id ORDER BY id DESC",
+      'SELECT TOP 1 id, in_time, out_time FROM clock_record WHERE employee_id = @employee_id AND individual_id = @individual_id ORDER BY id DESC',
     );
     if (type == '上班') {
       if (already_clock_in.recordset.length === 0 || already_clock_in.recordset[0].out_time !== null) {
@@ -245,14 +252,15 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
       }
     }
   } catch (error) {
-    console.log(error)
+    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
 
 async function makeUpClockIn(id, individual_id, in_time, out_time) {
-  let connection = await pool.connect();
   try {
+    console.log('makeUpClockIn');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('employee_id', mssql.Int, id);
@@ -291,35 +299,36 @@ async function makeUpClockIn(id, individual_id, in_time, out_time) {
       }
     }
   } catch (error) {
+    console.log(error);
     return { status: false, message: '伺服器錯誤' };
   }
 }
 
 async function updateClockRecord(id, in_time, out_time) {
-  let connection = await pool.connect();
   try {
+    console.log('updateClockRecord');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
-    console.log(id);
-    console.log(in_time);
-    console.log(out_time);
 
     request.input('id', mssql.Int, id);
     request.input('in_time', mssql.DateTime, in_time);
-    request.input('out_time', mssql.DateTime, out_time);
-
-    let update_record = await request.query('UPDATE clock_record SET in_time = @in_time, out_time = @out_time WHERE id = @id');
-
+    request.input('out_time', mssql.DateTime, out_time != 'Invalid date' && out_time != null && out_time != '' ? out_time : null);
+    
+    update_record = await request.query('UPDATE clock_record SET in_time = @in_time, out_time = @out_time WHERE id = @id');
+    
     if (update_record.rowsAffected[0] == 1) {
       return { status: true, message: '更新成功' };
     }
   } catch (error) {
+    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
 
 async function deleteClockRecord(id) {
-  let connection = await pool.connect();
   try {
+    console.log('deleteClockRecord');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
     request.input('id', mssql.Int, id);
 
@@ -327,13 +336,15 @@ async function deleteClockRecord(id) {
 
     if (update_account.rowsAffected[0] == 1) return { message: '刪除成功' };
   } catch (error) {
+    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
 
 async function getEmployee(employee_name, page, pageSize) {
-  let connection = await pool.connect();
   try {
+    console.log('getEmployee');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     let conditions = [];
@@ -362,13 +373,15 @@ async function getEmployee(employee_name, page, pageSize) {
 
     return { count: countRes.recordset[0].count, data: res.recordset };
   } catch (error) {
+    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
 
 async function getEmployeeById(employee_id) {
-  let connection = await pool.connect();
   try {
+    console.log('getEmployeeById');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('employee_id', mssql.Int, employee_id);
@@ -379,13 +392,15 @@ async function getEmployeeById(employee_id) {
 
     return res.recordset;
   } catch (error) {
+    console.log(error);
     return { message: '伺服器錯誤' };
   }
 }
 
 async function addEmployee(account, password, name) {
-  let connection = await pool.connect();
   try {
+    console.log('addEmployee');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('account', mssql.VarChar, account);
@@ -422,8 +437,9 @@ async function addEmployee(account, password, name) {
 }
 
 async function updateEmployee(id, account, password, name, employee_id) {
-  let connection = await pool.connect();
   try {
+    console.log('updateEmployee');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
     request.input('id', mssql.Int, id);
     request.input('account', mssql.VarChar, account.trim());
@@ -451,8 +467,9 @@ async function updateEmployee(id, account, password, name, employee_id) {
 }
 
 async function deleteEmployee(employee_id) {
-  let connection = await pool.connect();
   try {
+    console.log('deleteEmployee');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('employee_id', mssql.Int, employee_id);
@@ -467,8 +484,9 @@ async function deleteEmployee(employee_id) {
 }
 
 async function getIndividual(individual_name, page, pageSize) {
-  let connection = await pool.connect();
   try {
+    console.log('getIndividual');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     let parameters = [];
@@ -503,8 +521,9 @@ async function getIndividual(individual_name, page, pageSize) {
 }
 
 async function getIndividualById(individual_id) {
-  let connection = await pool.connect();
   try {
+    console.log('getIndividualById');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('individual_id', mssql.VarChar, individual_id);
@@ -519,8 +538,9 @@ async function getIndividualById(individual_id) {
 }
 
 async function addIndividual(individual_id, individual_name, settlement_id, type_id, morning_wage, afternoon_wage, night_wage) {
-  let connection = await pool.connect();
   try {
+    console.log('addIndividual');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('individual_id', mssql.VarChar, individual_id);
@@ -549,8 +569,9 @@ async function addIndividual(individual_id, individual_name, settlement_id, type
 }
 
 async function updateIndividual(individual_id, individual_name, settlement_id, type_id, morning_wage, afternoon_wage, night_wage) {
-  let connection = await pool.connect();
   try {
+    console.log('updateIndividual');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('individual_id', mssql.VarChar, individual_id);
@@ -574,8 +595,9 @@ async function updateIndividual(individual_id, individual_name, settlement_id, t
 }
 
 async function deleteIndividual(individual_id) {
-  let connection = await pool.connect();
   try {
+    console.log('deleteIndividual');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('individual_id', mssql.VarChar, individual_id);
@@ -590,8 +612,9 @@ async function deleteIndividual(individual_id) {
 }
 
 async function getSpecialRecord() {
-  let connection = await pool.connect();
   try {
+    console.log('getSpecialRecord');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     let res = await request.query(
@@ -606,8 +629,9 @@ async function getSpecialRecord() {
 }
 
 async function getSpecialRecordById(id) {
-  let connection = await pool.connect();
   try {
+    console.log('getSpecialRecordById');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('id', mssql.Int, id);
@@ -624,8 +648,9 @@ async function getSpecialRecordById(id) {
 }
 
 async function addSpecialRecord(special_case_id, individual_id, begin, end) {
-  let connection = await pool.connect();
   try {
+    console.log('addSpecialRecord');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('special_case_id', mssql.Int, special_case_id);
@@ -643,8 +668,9 @@ async function addSpecialRecord(special_case_id, individual_id, begin, end) {
 }
 
 async function updateSpecialRecord(id, special_case_id, individual_id, begin, end) {
-  let connection = await pool.connect();
   try {
+    console.log('updateSpecialRecord');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('id', mssql.Int, id);
@@ -666,8 +692,9 @@ async function updateSpecialRecord(id, special_case_id, individual_id, begin, en
 }
 
 async function deleteSpecialRecord(id) {
-  let connection = await pool.connect();
   try {
+    console.log('deleteSpecialRecord');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     request.input('id', mssql.Int, id);
@@ -682,8 +709,9 @@ async function deleteSpecialRecord(id) {
 }
 
 async function getSpecialCase() {
-  let connection = await pool.connect();
   try {
+    console.log('getSpecialCase');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     let res = await request.query('SELECT sc.special_case_id, sc.special_case_name, sc.multiple FROM special_case sc WHERE sc.enable = 1');
@@ -696,8 +724,9 @@ async function getSpecialCase() {
 }
 
 async function getSpecialCaseRecord(begin, end) {
-  let connection = await pool.connect();
   try {
+    console.log('getSpecialCaseRecord');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     const { DateTime } = mssql;
@@ -732,8 +761,9 @@ async function getSpecialCaseRecord(begin, end) {
 }
 
 async function getType() {
-  let connection = await pool.connect();
   try {
+    console.log('getType');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     let res = await request.query('SELECT t.type_id, t.type_name FROM type t WHERE t.enable = 1');
@@ -745,8 +775,9 @@ async function getType() {
 }
 
 async function getSettlement() {
-  let connection = await pool.connect();
   try {
+    console.log('getSettlement');
+    let connection = await pool.connect();
     const request = new mssql.Request(connection);
 
     let res = await request.query('SELECT s.settlement_id, s.settlement_name FROM settlement s WHERE s.enable = 1');
@@ -756,6 +787,11 @@ async function getSettlement() {
     return { message: '伺服器錯誤' };
   }
 }
+
+mssql.on('error', (err) => {
+  console.log(err + 'from mssql.on');
+  res.status(500).json({ message: '伺服器錯誤' });
+});
 
 module.exports = {
   getClockRecord,
