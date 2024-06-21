@@ -56,7 +56,7 @@ router.post('/login', async (req, res) => {
       expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 天
     });
 
-    res.json({ message: '成功登入', permission: user.permission, id: user.employee_id, individual_id: individual?.individual_id });
+    res.json({ message: '成功登入', permission: user.permission, id: user.employee_id, name: user.name, individual_id: individual?.individual_id });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: '伺服器錯誤' });
