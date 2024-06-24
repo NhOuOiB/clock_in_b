@@ -220,7 +220,7 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     request.input('action', mssql.VarChar, type);
 
     // 確保個案代號有在資料庫
-    let find_individual_case = await request.query('SELECT ic.individual_id FROM individual_case_ ic WHERE individual_id = @individual_id AND enable = 1');
+    let find_individual_case = await request.query('SELECT ic.individual_id FROM individual_case ic WHERE individual_id = @individual_id AND enable = 1');
     let individual_data = find_individual_case.recordset;
     if (individual_data.length === 0) {
       return { status: false, message: '個案代號錯誤，請重新登入' };
