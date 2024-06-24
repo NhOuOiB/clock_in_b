@@ -208,20 +208,19 @@ async function getClockRecordByEmployee(individual_id, page, pageSize) {
 
 async function addClockRecord(id, individual_id, type, lat, lng) {
   const connection = await pool.connect();
-  const transaction = new mssql.Transaction(connection);
 
   try {
-    await transaction.begin();
-    const request = new mssql.Request(transaction);
+    const request = new mssql.Request(connection);
     const now = new Date();
 
     request.input('employee_id', mssql.Int, id);
     request.input('individual_id', mssql.VarChar, individual_id);
     request.input('now', mssql.DateTime, now);
     request.input('latlng', mssql.VarChar, `${lat}, ${lng}`);
+    request.input('action', mssql.VarChar, type);
 
     // 確保個案代號有在資料庫
-    let find_individual_case = await request.query('SELECT ic.individual_id FROM individual_case ic WHERE individual_id = @individual_id AND enable = 1');
+    let find_individual_case = await request.query('SELECT ic.individual_id FROM individual_case_ ic WHERE individual_id = @individual_id AND enable = 1');
     let individual_data = find_individual_case.recordset;
     if (individual_data.length === 0) {
       return { status: false, message: '個案代號錯誤，請重新登入' };
@@ -237,46 +236,34 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
         await request.query('INSERT INTO clock_record (employee_id, individual_id, in_time, in_lat_lng, enable) VALUES (@employee_id, @individual_id, @now, @latlng, 1)');
 
         // 打卡動作紀錄
-        await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, '上班')`);
-        await transaction.commit();
+        await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, @action)`);
         return { status: true, message: '打卡成功' };
       } else {
         return { status: false, message: '上次打卡紀錄還沒有下班' };
       }
-    } else {
+    } else if (type === '下班') {
       if (already_clock_in.recordset.length !== 0 && already_clock_in.recordset[0].out_time === null) {
         request.input('id', mssql.Int, already_clock_in.recordset[0].id);
         await request.query('UPDATE clock_record SET out_time = @now, out_lat_lng = @latlng WHERE id = @id');
 
         // 打卡動作紀錄
-        await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, '下班')`);
-        await transaction.commit();
+        await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, @action)`);
         return { status: true, message: '打卡成功' };
       } else {
         return { status: false, message: '沒有上班紀錄不能打下班卡' };
       }
+    } else {
+      return {status: false, message: '來源錯誤'}
     }
   } catch (error) {
-    await transaction.rollback();
-    // 確保動作紀錄
-    await ClockRecordHistory(id, individual_id, `${type}失敗`);
-    console.log(error);
-    return { message: '伺服器錯誤' };
-  } finally {
-    connection.release();
-  }
-}
-
-async function ClockRecordHistory(employee_id, individual_id, action) {
-  const connection = await pool.connect();
-  try {
     const request = new mssql.Request(connection);
-    request.input('employee_id', mssql.Int, employee_id);
+    // 確保動作紀錄
+    request.input('employee_id', mssql.Int, id);
     request.input('individual_id', mssql.VarChar, individual_id);
-    request.input('action', mssql.VarChar, action);
-    await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, @action)`);
-  } catch (error) {
-    console.log('記錄動作失敗', error);
+    request.input('action', mssql.VarChar, type);
+    request.input('error', mssql.VarChar, error.message);
+    await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action, error) VALUES (@employee_id, @individual_id, @action, @error)`);
+    return { message: `伺服器錯誤，${error.message}` };
   } finally {
     connection.release();
   }
