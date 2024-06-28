@@ -210,6 +210,8 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
   const connection = await pool.connect();
 
   try {
+    console.log('addClockRecord')
+    console.log(`employee_id : ${id} individual_id : ${individual_id} type : ${type}`)
     const request = new mssql.Request(connection);
     const now = new Date();
 
