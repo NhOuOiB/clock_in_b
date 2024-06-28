@@ -10,8 +10,8 @@ async function getClockRecord(settlement_id, settlement_type, begin, end, indivi
     const { DateTime, Int } = mssql;
 
     // 創建查詢條件
-    const conditions = [];
-    const parameters = [];
+    let conditions = [];
+    let parameters = [];
 
     parameters.push({ name: 'pageSize', type: mssql.Int, value: pageSize });
     parameters.push({ name: 'page', type: mssql.Int, value: (page - 1) * pageSize });
@@ -210,8 +210,14 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
   const connection = await pool.connect();
 
   try {
-    console.log('addClockRecord')
-    console.log(`employee_id : ${id} individual_id : ${individual_id} type : ${type}`)
+    if (!connection.connected) {
+      console.error('Database connection failed.');
+      return { status: false, message: '資料庫連線失敗' };
+    }
+
+    console.log('Database connection successful.');
+    console.log('addClockRecord');
+    console.log(`employee_id : ${id} individual_id : ${individual_id} type : ${type} lat : ${lat} lng : ${lng}`);
     const request = new mssql.Request(connection);
     const now = new Date();
 
@@ -225,6 +231,7 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     let find_individual_case = await request.query('SELECT ic.individual_id FROM individual_case ic WHERE individual_id = @individual_id AND enable = 1');
     let individual_data = find_individual_case.recordset;
     if (individual_data.length === 0) {
+      console.log('個案代號錯誤，請重新登入');
       return { status: false, message: '個案代號錯誤，請重新登入' };
     }
 
@@ -235,27 +242,46 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     if (type === '上班') {
       if (already_clock_in.recordset.length === 0 || already_clock_in.recordset[0].out_time !== null) {
         // 插入新的打卡記錄
-        await request.query('INSERT INTO clock_record (employee_id, individual_id, in_time, in_lat_lng, enable) VALUES (@employee_id, @individual_id, @now, @latlng, 1)');
-
+        let clockResult = await request.query(
+          'INSERT INTO clock_record (employee_id, individual_id, in_time, in_lat_lng, enable) VALUES (@employee_id, @individual_id, @now, @latlng, 1)',
+        );
+        if (clockResult.rowsAffected === 0) {
+          console.log('上班 失敗');
+          return { status: true, message: '打卡失敗，請重新嘗試' };
+        }
         // 打卡動作紀錄
-        await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, @action)`);
+        const clockHistoryResult = await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, @action)`);
+        if (clockHistoryResult.rowsAffected === 0) {
+          console.log('上班history 失敗');
+        }
         return { status: true, message: '打卡成功' };
       } else {
+        console.log('上次打卡紀錄還沒有下班');
         return { status: false, message: '上次打卡紀錄還沒有下班' };
       }
     } else if (type === '下班') {
       if (already_clock_in.recordset.length !== 0 && already_clock_in.recordset[0].out_time === null) {
         request.input('id', mssql.Int, already_clock_in.recordset[0].id);
-        await request.query('UPDATE clock_record SET out_time = @now, out_lat_lng = @latlng WHERE id = @id');
+        let clockResult = await request.query('UPDATE clock_record SET out_time = @now, out_lat_lng = @latlng WHERE id = @id');
+
+        if (clockResult.rowsAffected === 0) {
+          console.log('下班 失敗');
+          return { status: true, message: '打卡失敗，請重新嘗試' };
+        }
 
         // 打卡動作紀錄
-        await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, @action)`);
+        let clockHistoryResult = await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, @action)`);
+        if (clockHistoryResult.rowsAffected === 0) {
+          console.log('下班history 失敗');
+        }
         return { status: true, message: '打卡成功' };
       } else {
+        console.log('沒有上班紀錄不能打下班卡');
         return { status: false, message: '沒有上班紀錄不能打下班卡' };
       }
     } else {
-      return {status: false, message: '來源錯誤'}
+      console.log('來源錯誤');
+      return { status: false, message: '來源錯誤' };
     }
   } catch (error) {
     const request = new mssql.Request(connection);
@@ -265,9 +291,11 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     request.input('action', mssql.VarChar, type);
     request.input('error', mssql.VarChar, error.message);
     await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action, error) VALUES (@employee_id, @individual_id, @action, @error)`);
+    console.log(`伺服器錯誤，${error.message}`);
     return { message: `伺服器錯誤，${error.message}` };
   } finally {
-    connection.release();
+    await connection.close();
+    console.log(`${connection.connected ? 'Database connection on' : 'Database connection off'}`);
   }
 }
 
