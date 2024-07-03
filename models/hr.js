@@ -245,16 +245,18 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
         let clockResult = await request.query(
           'INSERT INTO clock_record (employee_id, individual_id, in_time, in_lat_lng, enable) VALUES (@employee_id, @individual_id, @now, @latlng, 1)',
         );
-        if (clockResult.rowsAffected === 0) {
+
+        if (clockResult.rowsAffected[0] === 0) {
           console.log('上班 失敗');
           return { status: true, message: '打卡失敗，請重新嘗試' };
         }
         // 打卡動作紀錄
         const clockHistoryResult = await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, @action)`);
-        if (clockHistoryResult.rowsAffected === 0) {
+        if (clockHistoryResult.rowsAffected[0] === 0) {
           console.log('上班history 失敗');
         }
-        return { status: true, message: '打卡成功' };
+
+        if (clockResult.rowsAffected[0] === 1) return { status: true, message: '打卡成功' };
       } else {
         console.log('上次打卡紀錄還沒有下班');
         return { status: false, message: '上次打卡紀錄還沒有下班' };
@@ -264,17 +266,18 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
         request.input('id', mssql.Int, already_clock_in.recordset[0].id);
         let clockResult = await request.query('UPDATE clock_record SET out_time = @now, out_lat_lng = @latlng WHERE id = @id');
 
-        if (clockResult.rowsAffected === 0) {
+        if (clockResult.rowsAffected[0] === 0) {
           console.log('下班 失敗');
           return { status: true, message: '打卡失敗，請重新嘗試' };
         }
 
         // 打卡動作紀錄
         let clockHistoryResult = await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action) VALUES (@employee_id, @individual_id, @action)`);
-        if (clockHistoryResult.rowsAffected === 0) {
+        if (clockHistoryResult.rowsAffected[0] === 0) {
           console.log('下班history 失敗');
         }
-        return { status: true, message: '打卡成功' };
+
+        if (clockResult.rowsAffected[0] === 1) return { status: true, message: '打卡成功' };
       } else {
         console.log('沒有上班紀錄不能打下班卡');
         return { status: false, message: '沒有上班紀錄不能打下班卡' };
