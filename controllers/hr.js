@@ -21,6 +21,7 @@ async function getClockRecordByEmployee(req, res) {
 
 async function addClockRecord(req, res) {
   let { id, individual_id, type, lat, lng } = req.body;
+  console.log(`cache-control : ${req.headers['cache-control']} pragma : ${req.headers['pragma']} expires : ${req.headers['expires']}`);
   let result = await hrModel.addClockRecord(id, individual_id, type, lat, lng);
 
   res.json(result);
@@ -76,7 +77,7 @@ async function deleteEmployee(req, res) {
 }
 
 async function getIndividual(req, res) {
-  let {individual_name, page, pageSize} = req.query
+  let { individual_name, page, pageSize } = req.query;
   let data = await hrModel.getIndividual(individual_name, page, pageSize);
   res.json(data);
 }
