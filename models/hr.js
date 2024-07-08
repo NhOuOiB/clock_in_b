@@ -242,9 +242,11 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     if (type === '上班') {
       if (already_clock_in.recordset.length === 0 || already_clock_in.recordset[0].out_time !== null) {
         // 插入新的打卡記錄
-        let clockResult = await request.query(
-          'INSERT INTO clock_record (employee_id, individual_id, in_time, in_lat_lng, enable) VALUES (@employee_id, @individual_id, @now, @latlng, 1)',
-        );
+
+        let clockResult =
+          lat === undefined || lng === undefined
+            ? await request.query('INSERT INTO clock_record (employee_id, individual_id, in_time, enable) VALUES (@employee_id, @individual_id, @now, 1)')
+            : await request.query('INSERT INTO clock_record (employee_id, individual_id, in_time, in_lat_lng, enable) VALUES (@employee_id, @individual_id, @now, @latlng, 1)');
 
         if (clockResult.rowsAffected[0] === 0) {
           console.log('上班 失敗');
@@ -264,7 +266,11 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     } else if (type === '下班') {
       if (already_clock_in.recordset.length !== 0 && already_clock_in.recordset[0].out_time === null) {
         request.input('id', mssql.Int, already_clock_in.recordset[0].id);
-        let clockResult = await request.query('UPDATE clock_record SET out_time = @now, out_lat_lng = @latlng WHERE id = @id');
+
+        let clockResult =
+          lat === undefined || lng === undefined
+            ? await request.query('UPDATE clock_record SET out_time = @now WHERE id = @id')
+            : await request.query('UPDATE clock_record SET out_time = @now, out_lat_lng = @latlng WHERE id = @id');
 
         if (clockResult.rowsAffected[0] === 0) {
           console.log('下班 失敗');
