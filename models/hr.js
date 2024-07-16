@@ -302,10 +302,11 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action, error) VALUES (@employee_id, @individual_id, @action, @error)`);
     console.log(`伺服器錯誤，${error.message}`);
     return { message: `伺服器錯誤，${error.message}` };
-  } finally {
-    await connection.close();
-    console.log(`${connection.connected ? 'Database connection on' : 'Database connection off'}`);
-  }
+   } 
+  // finally {
+  //   await connection.close();
+  //   console.log(`${connection.connected ? 'Database connection on' : 'Database connection off'}`);
+  // }
 }
 
 async function makeUpClockIn(id, individual_id, in_time, out_time) {
