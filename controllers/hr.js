@@ -156,6 +156,12 @@ async function getSettlement(req, res) {
   res.json(data);
 }
 
+async function doubleCheck(req, res) {
+  let { id, individual_id, type, time } = req.body;
+  let response = await hrModel.doubleCheck(id, individual_id, type, time);
+  res.json(response);
+}
+
 module.exports = {
   getClockRecord,
   getClockRecordById,
@@ -183,4 +189,5 @@ module.exports = {
   getSpecialCaseRecord,
   getType,
   getSettlement,
+  doubleCheck,
 };

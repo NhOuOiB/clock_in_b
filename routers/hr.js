@@ -54,4 +54,6 @@ router.get('/getType', hrController.getType);
 
 router.get('/getSettlement', hrController.getSettlement);
 
+router.post('/doubleCheck', hrController.doubleCheck);
+
 module.exports = router;

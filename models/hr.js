@@ -258,7 +258,7 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
           console.log('上班history 失敗');
         }
 
-        if (clockResult.rowsAffected[0] === 1) return { status: true, message: '打卡成功' };
+        if (clockResult.rowsAffected[0] === 1) return { status: true, message: '打卡成功', time: now };
       } else {
         console.log('上次打卡紀錄還沒有下班');
         return { status: false, message: '上次打卡紀錄還沒有下班' };
@@ -283,7 +283,7 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
           console.log('下班history 失敗');
         }
 
-        if (clockResult.rowsAffected[0] === 1) return { status: true, message: '打卡成功' };
+        if (clockResult.rowsAffected[0] === 1) return { status: true, message: '打卡成功', time: now };
       } else {
         console.log('沒有上班紀錄不能打下班卡');
         return { status: false, message: '沒有上班紀錄不能打下班卡' };
@@ -302,7 +302,7 @@ async function addClockRecord(id, individual_id, type, lat, lng) {
     await request.query(`INSERT INTO clock_record_history (employee_id, individual_id, action, error) VALUES (@employee_id, @individual_id, @action, @error)`);
     console.log(`伺服器錯誤，${error.message}`);
     return { message: `伺服器錯誤，${error.message}` };
-   } 
+  }
   // finally {
   //   await connection.close();
   //   console.log(`${connection.connected ? 'Database connection on' : 'Database connection off'}`);
@@ -840,6 +840,46 @@ async function getSettlement() {
   }
 }
 
+async function doubleCheck(id, individual_id, type, time) {
+  try {
+    console.log('doubleCheck');
+    console.log(`id : ${id} individual_id : ${individual_id} type : ${type} time : ${time}`);
+    let connection = await pool.connect();
+    const request = new mssql.Request(connection);
+
+    request.input('id', mssql.Int, id);
+    request.input('individual_id', mssql.VarChar, individual_id);
+    request.input('time', mssql.DateTime, time);
+
+    if (type === '上班') {
+      let res = await request.query('SELECT * FROM clock_record cr WHERE cr.enable = 1 AND employee_id = @id AND individual_id = @individual_id AND in_time = @time');
+      console.log(res.recordset);
+      if (res.recordset.length > 0) {
+        console.log('打卡成功');
+        return { status: true, message: '打卡成功' };
+      } else {
+        console.log('打卡失敗');
+        return { status: false, message: '打卡失敗，請再試一次' };
+      }
+    } else if (type === '下班') {
+      let res = await request.query('SELECT * FROM clock_record cr WHERE cr.enable = 1 AND employee_id = @id AND individual_id = @individual_id AND out_time = @time');
+      console.log(res.recordset);
+      if (res.recordset.length > 0) {
+        console.log('打卡成功');
+        return { status: true, message: '打卡成功' };
+      } else {
+        console.log('打卡失敗');
+        return { status: false, message: '打卡失敗，請再試一次' };
+      }
+    } else {
+      return { status: false, message: '來源錯誤' };
+    }
+  } catch (error) {
+    console.log(error);
+    return { status: false, message: '伺服器錯誤' };
+  }
+}
+
 mssql.on('error', (err) => {
   console.log(err + 'from mssql.on');
   res.status(500).json({ message: '伺服器錯誤' });
@@ -872,4 +912,5 @@ module.exports = {
   getSpecialCaseRecord,
   getType,
   getSettlement,
+  doubleCheck,
 };
